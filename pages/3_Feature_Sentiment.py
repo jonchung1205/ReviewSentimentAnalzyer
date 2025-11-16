@@ -15,7 +15,7 @@ from pipeline.feature_sentiment import analyze_sentiment
 
 st.title("Feature-Specific Sentiment Analysis")
 
-DEFAULT_CSV = "data/processed/noom_google_clean.csv"
+DEFAULT_CSV = "data/processed/fooducate_us_clean.csv"
 
 uploaded_file = st.file_uploader("Upload cleaned reviews CSV", type=["csv"])
 

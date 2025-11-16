@@ -8,7 +8,7 @@ st.write("""
 Use the sidebar to navigate between pages.
 
 - **Feature-Specific Sentiment Analysis**
-- (Add more pages here in the future)
+- **Scraper Page**
 
 This main page is just a landing page.
 """)
