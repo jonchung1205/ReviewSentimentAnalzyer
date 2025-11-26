@@ -146,49 +146,78 @@ def _split_clauses(text: str):
     return [p.strip() for p in parts if len(p.strip()) > 3]
 
 
-#Assign Feature Bucket
+# -------------------------------
+# Feature Assignment
+# -------------------------------
 def _assign_bucket(text: str):
     t = text.lower()
     for bucket, keywords in FEATURE_BUCKETS.items():
-        if any(k in t for k in keywords):
-            return bucket
+        for k in keywords:
+            pattern = r"\b" + re.escape(k) + r"\b"
+            if re.search(pattern, t):
+                return bucket
     return None
 
-#Analysis Function
+
+# -------------------------------
+# Main Sentiment Analysis
+# -------------------------------
 def analyze_sentiment(df: pd.DataFrame, text_column: str = "cleaned_content"):
-    model = hf_pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+    model = hf_pipeline(
+        "sentiment-analysis",
+        model="cardiffnlp/twitter-roberta-base-sentiment-latest"
+    )
 
     results = []
 
     for review in df[text_column].dropna():
+
         for sentence in sent_tokenize(review):
             for clause in _split_clauses(sentence):
+
                 bucket = _assign_bucket(clause)
-                if bucket:
-                    output = model(clause)[0]
-                    results.append({
-                        "clause": clause,
-                        "feature": bucket,
-                        "sentiment": output["label"],
-                        "confidence": float(output["score"]),
-                        "review": review
-                    })
+                if not bucket:
+                    continue
+
+                # Run the model on this clause
+                output = model(clause)[0]
+
+                sentiment = output["label"].upper()   # NEUTRAL / POSITIVE / NEGATIVE
+                score = float(output["score"])
+
+                results.append({
+                    "clause": clause,
+                    "feature": bucket,
+                    "sentiment": sentiment,
+                    "confidence": score,
+                    "review": review
+                })
 
     sent_df = pd.DataFrame(results)
 
     if sent_df.empty:
         return sent_df, pd.DataFrame()
 
+    # -------------------------------
+    # Summary Table
+    # -------------------------------
     summary = (
         sent_df.groupby(["feature", "sentiment"])
         .size()
         .unstack(fill_value=0)
-        .assign(total=lambda x: x.sum(axis=1))
     )
+
+    # Ensure all sentiment columns exist
+    for col in ["POSITIVE", "NEGATIVE", "NEUTRAL"]:
+        if col not in summary.columns:
+            summary[col] = 0
+
+    summary["total"] = summary.sum(axis=1)
 
     summary["positive_rate"] = summary["POSITIVE"] / summary["total"]
     summary["negative_rate"] = summary["NEGATIVE"] / summary["total"]
     summary["sentiment_score"] = summary["positive_rate"] - summary["negative_rate"]
+
     summary = summary.sort_values("sentiment_score", ascending=False)
 
     return sent_df, summary
