@@ -10,7 +10,7 @@ Examples of common product questions this tool helps answer:
 - Are pricing and subscription models a source of negative sentiment?
 - Are technical issues impacting retention?
 
-The feature-level sentiment breakdown is especially useful for **product teams, growth teams, and consulting analyses** focused on understanding *why* users feel a certain way — not just *how* they feel.
+The feature-level sentiment breakdown is especially useful for **product teams, growth teams, and consulting analyses** focused on understanding which features may influence user sentiment.
 
 ---
 
@@ -120,7 +120,7 @@ This enables direct comparisons such as:
 
 ## Deployment
 
-This app is deployed using **Streamlit Cloud** and can be accessed via a public URL.
+This app is deployed using **Streamlit Cloud** and can be accessed via a public URL: https://reviewsentimentanalyzer.streamlit.app/
 
 ### How to Use the Deployed App
 1. Select **Apple App Store** or **Google Play**
