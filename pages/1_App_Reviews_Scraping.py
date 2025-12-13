@@ -8,8 +8,7 @@ import re
 MAX_REVIEWS = 500
 
 # ==================== INITIALIZATION ====================
-if 'search_results' not in st.session_state:
-    st.session_state.search_results = []
+
 if 'selected_app_id' not in st.session_state:
     st.session_state.selected_app_id = None
 if 'selected_app_name' not in st.session_state:
