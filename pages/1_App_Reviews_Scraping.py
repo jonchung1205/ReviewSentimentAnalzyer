@@ -1,58 +1,68 @@
 import streamlit as st
 import pandas as pd
 import requests
+import re
 from app_store_web_scraper import AppStoreEntry
 from google_play_scraper import Sort, reviews, search, app as gplay_app
-import re
 
 MAX_REVIEWS = 500
 
 # ==================== INITIALIZATION ====================
-
-if 'selected_app_id' not in st.session_state:
+if "search_results" not in st.session_state:
+    st.session_state.search_results = []
+if "selected_app_id" not in st.session_state:
     st.session_state.selected_app_id = None
-if 'selected_app_name' not in st.session_state:
+if "selected_app_name" not in st.session_state:
     st.session_state.selected_app_name = None
-if 'scraped_df' not in st.session_state:
+if "scraped_df" not in st.session_state:
     st.session_state.scraped_df = None
-if 'platform' not in st.session_state:
+if "platform" not in st.session_state:
     st.session_state.platform = "App Store"
+if "gplay_url_input" not in st.session_state:
+    st.session_state.gplay_url_input = ""
 
 # ==================== SEARCH FUNCTIONS ====================
 def search_appstore(app_name):
     url = "https://itunes.apple.com/search"
     params = {"term": app_name, "entity": "software", "limit": 10}
     try:
-        resp = requests.get(url, params=params).json()
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        
+        if not data or "results" not in data:
+            return None, []
+        
+        results = []
+        for item in data.get("results", []):
+            results.append({
+                "app_id": item.get("trackId"),
+                "name": item.get("trackName"),
+                "developer": item.get("sellerName"),
+                "url": item.get("trackViewUrl")
+            })
+        return None, results
     except Exception as e:
-        return {"error": str(e)}, []
-
-    results = []
-    for item in resp.get("results", []):
-        results.append({
-            "app_id": item.get("trackId"),
-            "name": item.get("trackName"),
-            "developer": item.get("sellerName"),
-            "url": item.get("trackViewUrl")
-        })
-    return None, results
+        return {"error": "Failed to search App Store. Please try again."}, []
 
 def search_gplay(app_name):
     try:
         results = search(app_name, lang="en", country="us")
+        if not results:
+            return None, []
+            
+        parsed = []
+        for r in results[:10]:
+            if r.get("appId"):
+                parsed.append({
+                    "app_id": r.get("appId"),
+                    "name": r.get("title"),
+                    "developer": r.get("developer"),
+                    "url": r.get("url")
+                })
+        return None, parsed
     except Exception as e:
-        return {"error": str(e)}, []
-
-    parsed = []
-    for r in results[:10]:
-        if r.get("appId"):
-            parsed.append({
-                "app_id": r.get("appId"),
-                "name": r.get("title"),
-                "developer": r.get("developer"),
-                "url": r.get("url")
-            })
-    return None, parsed
+        return {"error": "Failed to search Google Play. Please try again."}, []
 
 def get_package_from_url(url: str):
     match = re.search(r'id=([a-zA-Z0-9._]+)', url)
@@ -123,28 +133,41 @@ def scrape_gplay_reviews(app_id, max_reviews=MAX_REVIEWS):
     return pd.DataFrame(all_reviews[:max_reviews])
 
 # ==================== STREAMLIT INTERFACE ====================
-st.title("📱 App Review Scraper & Downloader")
+st.title("App Review Scraper & Downloader")
 st.write("Search any mobile app and scrape up to 500 reviews from either store.")
-st.write("Note: If you want to scrape from Google Play and the App Name does not show up in the results, you will need to paste the URL and hit Scrape and Download (ex. https://play.google.com/store/apps/details?id=com.wsl.noom&hl=en_US)")
+st.write("If the app doesn't appear in Google Play search, paste its URL and scrape directly.")
+st.write("Ex: https://play.google.com/store/apps/details?id=com.omada.prevent&hl=en_US")
 
+# --- App name input ---
 app_name_input = st.text_input("Enter App Name")
 
+# --- Platform selector ---
+previous_platform = st.session_state.platform
 st.session_state.platform = st.radio(
     "Choose Platform",
     ["App Store", "Google Play"],
     horizontal=True
 )
 
-# --- SEARCH BUTTON ---
-def handle_search():
-    if not app_name_input.strip():
-        st.error("Please enter an app name.")
-        return
-
+# Clear search results, URL input, and selections if platform switched
+if previous_platform != st.session_state.platform:
+    st.session_state.gplay_url_input = ""
     st.session_state.search_results = []
     st.session_state.selected_app_id = None
     st.session_state.selected_app_name = None
     st.session_state.scraped_df = None
+
+# --- Search button ---
+def handle_search():
+    if not app_name_input.strip():
+        st.error("Please enter an app name.")
+        return
+    # Clear previous search/scrape and URL input
+    st.session_state.search_results = []
+    st.session_state.selected_app_id = None
+    st.session_state.selected_app_name = None
+    st.session_state.scraped_df = None
+    st.session_state.gplay_url_input = ""
 
     if st.session_state.platform == "App Store":
         error, results = search_appstore(app_name_input)
@@ -152,16 +175,16 @@ def handle_search():
         error, results = search_gplay(app_name_input)
 
     if error:
-        st.error(f"Error: {error}")
+        st.error(error["error"])
     elif not results:
-        st.error("No apps found.")
+        st.warning("No apps found. Please try a different search term.")
     else:
         st.session_state.search_results = results
         st.success(f"Found {len(results)} results in {st.session_state.platform}.")
 
 st.button("Search App", on_click=handle_search)
 
-# --- SELECT APP & SCRAPE ---
+# --- Select App & Scrape ---
 if st.session_state.search_results:
     st.subheader(f"Select App from {st.session_state.platform} Results")
     app_options = {f"{r['name']} — {r['developer']}": r["app_id"] for r in st.session_state.search_results if r.get("app_id")}
@@ -174,23 +197,33 @@ if st.session_state.search_results:
         if st.session_state.selected_app_name in labels:
             default_index = labels.index(st.session_state.selected_app_name)
 
-        selected_label = st.selectbox("Results", options=labels, index=default_index, key="selected_label_box")
+        selected_label = st.selectbox(
+            "Results",
+            options=labels,
+            index=default_index,
+            key="selected_label_box"
+        )
         st.session_state.selected_app_id = app_options[selected_label]
         st.session_state.selected_app_name = selected_label
         st.info(f"App to scrape: **{selected_label}** | ID: `{st.session_state.selected_app_id}`")
 
-        # --- URL fallback ---
-        st.markdown(
-            "If the app is not listed above or the ID is missing, you can paste the Google Play URL below:"
-        )
-        gplay_url_input = st.text_input("Google Play URL (optional)")
-        if gplay_url_input.strip():
-            info = get_package_from_url(gplay_url_input.strip())
-            if info:
-                st.session_state.selected_app_id = info["app_id"]
-                st.session_state.selected_app_name = f"{info['name']} — {info['developer']}"
-                st.info(f"Using App from URL: {info['name']} | ID: {info['app_id']}")
+        # --- URL fallback (ONLY for Google Play) ---
+        if st.session_state.platform == "Google Play":
+            gplay_url_input = st.text_input(
+                "Google Play URL (optional)",
+                value=st.session_state.gplay_url_input,
+                key="gplay_url_field"
+            )
+            st.session_state.gplay_url_input = gplay_url_input
+            
+            if gplay_url_input.strip():
+                info = get_package_from_url(gplay_url_input.strip())
+                if info:
+                    st.session_state.selected_app_id = info["app_id"]
+                    st.session_state.selected_app_name = f"{info['name']} — {info['developer']}"
+                    st.info(f"Using App from URL: {info['name']} | ID: {info['app_id']}")
 
+        # --- Scrape button ---
         def handle_scrape():
             if not st.session_state.selected_app_id:
                 st.warning("Please select an app first.")
@@ -209,12 +242,12 @@ if st.session_state.search_results:
 
         st.button("Scrape Reviews", on_click=handle_scrape)
 
-# --- DOWNLOAD CSV ---
+# --- Download CSV ---
 if st.session_state.scraped_df is not None:
     df = st.session_state.scraped_df
-    csv_data = df.to_csv(index=False).encode('utf-8')
+    csv_data = df.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label="📥 Download Reviews as CSV",
+        label="Download Reviews as CSV",
         data=csv_data,
         file_name=f"{st.session_state.platform.lower().replace(' ', '_')}_{st.session_state.selected_app_id}_reviews.csv",
         mime="text/csv"
