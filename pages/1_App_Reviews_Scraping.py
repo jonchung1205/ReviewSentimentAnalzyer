@@ -187,27 +187,18 @@ st.button("Search App", on_click=handle_search)
 # --- Select App & Scrape ---
 if st.session_state.search_results:
     st.subheader(f"Select App from {st.session_state.platform} Results")
-    app_options = {f"{r['name']} — {r['developer']}": r["app_id"] for r in st.session_state.search_results if r.get("app_id")}
+    # Build app options from search results
+    app_options = {
+        f"{r['name']} — {r['developer']}": r["app_id"]
+        for r in st.session_state.search_results
+        if r.get("app_id")
+    }
 
     if not app_options:
         st.warning("No valid apps with IDs found.")
     else:
-        labels = list(app_options.keys())
-        default_index = 0
-        if st.session_state.selected_app_name in labels:
-            default_index = labels.index(st.session_state.selected_app_name)
-
-        selected_label = st.selectbox(
-            "Results",
-            options=labels,
-            index=default_index,
-            key="selected_label_box"
-        )
-        st.session_state.selected_app_id = app_options[selected_label]
-        st.session_state.selected_app_name = selected_label
-        st.info(f"App to scrape: **{selected_label}** | ID: `{st.session_state.selected_app_id}`")
-
-        # --- URL fallback (ONLY for Google Play) ---
+        # --- URL input for Google Play (takes priority) ---
+        gplay_url_input = ""
         if st.session_state.platform == "Google Play":
             gplay_url_input = st.text_input(
                 "Google Play URL (optional)",
@@ -215,13 +206,31 @@ if st.session_state.search_results:
                 key="gplay_url_field"
             )
             st.session_state.gplay_url_input = gplay_url_input
-            
-            if gplay_url_input.strip():
-                info = get_package_from_url(gplay_url_input.strip())
-                if info:
-                    st.session_state.selected_app_id = info["app_id"]
-                    st.session_state.selected_app_name = f"{info['name']} — {info['developer']}"
-                    st.info(f"Using App from URL: {info['name']} | ID: {info['app_id']}")
+
+        # --- Determine which app to scrape ---
+        if st.session_state.platform == "Google Play" and gplay_url_input.strip():
+            # URL input takes priority
+            info = get_package_from_url(gplay_url_input.strip())
+            if info:
+                st.session_state.selected_app_id = info["app_id"]
+                st.session_state.selected_app_name = f"{info['name']} — {info['developer']}"
+                st.info(f"Using App from URL: {info['name']} | ID: {info['app_id']}")
+        else:
+            # Default to search selection
+            labels = list(app_options.keys())
+            default_index = 0
+            if st.session_state.selected_app_name in labels:
+                default_index = labels.index(st.session_state.selected_app_name)
+
+            selected_label = st.selectbox(
+                "Results",
+                options=labels,
+                index=default_index,
+                key="selected_label_box"
+            )
+            st.session_state.selected_app_id = app_options[selected_label]
+            st.session_state.selected_app_name = selected_label
+            st.info(f"App to scrape: **{selected_label}** | ID: `{st.session_state.selected_app_id}`")
 
         # --- Scrape button ---
         def handle_scrape():
@@ -231,12 +240,18 @@ if st.session_state.search_results:
             st.session_state.scraped_df = None
             with st.spinner(f"Scraping up to {MAX_REVIEWS} reviews…"):
                 if st.session_state.platform == "App Store":
-                    df = scrape_appstore_reviews(st.session_state.selected_app_id, max_reviews=MAX_REVIEWS)
+                    df = scrape_appstore_reviews(
+                        st.session_state.selected_app_id, max_reviews=MAX_REVIEWS
+                    )
                 else:
-                    df = scrape_gplay_reviews(st.session_state.selected_app_id, max_reviews=MAX_REVIEWS)
+                    df = scrape_gplay_reviews(
+                        st.session_state.selected_app_id, max_reviews=MAX_REVIEWS
+                    )
             if not df.empty:
                 st.session_state.scraped_df = df
-                st.success(f"Successfully scraped {len(df)} reviews! You can download the CSV below.")
+                st.success(
+                    f"Successfully scraped {len(df)} reviews! You can download the CSV below."
+                )
             else:
                 st.warning("No reviews found.")
 

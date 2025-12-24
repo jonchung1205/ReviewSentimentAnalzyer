@@ -10,18 +10,6 @@ import unicodedata
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
-# --- Configuration ---
-INPUT_FILE = '/Users/maliktraore/Omada_Health/Google_Play_Reviews_OG/SnapCalorie AI Calorie Counter_reviews.csv'
-OUTPUT_FILE = '/Users/maliktraore/Omada_Health/SnapCal_GooglePlay_Cleaned.csv' # Renamed file to reflect the new ordering
-# Download required NLTK data (run only once)
-# This will download the necessary data files if they aren't already present.
-try:
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
-    nltk.download('wordnet', quiet=True)
-except Exception as e:
-    print(f"Error downloading NLTK data: {e}. Please ensure NLTK is installed.")
-
 
 # -------------------------
 # Text cleaning function

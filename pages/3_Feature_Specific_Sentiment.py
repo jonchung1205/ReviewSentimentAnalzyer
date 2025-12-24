@@ -75,41 +75,58 @@ st.success("Feature-level sentiment analysis complete!")
 
 
 # -----------------------------------------
-# CONFIDENCE HISTOGRAM
-# -----------------------------------------
-st.subheader("Model Confidence Distribution")
-
-fig, ax = plt.subplots(figsize=(6, 4))  # Smaller figure
-result_df["confidence"].hist(bins=25, edgecolor="black", ax=ax)
-ax.set_xlabel("Confidence Score")
-ax.set_ylabel("Frequency")
-ax.set_title("Confidence Distribution")
-
-st.pyplot(fig)
-
-
-# -----------------------------------------
 # FEATURE SUMMARY TABLE
 # -----------------------------------------
 st.subheader("Feature-Level Sentiment Summary")
 st.dataframe(summary_df)
 
-
 # -----------------------------------------
-# BAR CHART: SENTIMENT SCORE BY FEATURE
+# SIDE-BY-SIDE VISUALIZATIONS
 # -----------------------------------------
-st.subheader("Sentiment Score by Feature")
 
-fig2, ax2 = plt.subplots(figsize=(8, 5))
+st.subheader("Visual Analysis: Feature Ranking vs. Model Confidence")
 
-colors = ["#4CAF50" if x >= 0 else "#F44336" for x in summary_df["sentiment_score"]]
-summary_df["sentiment_score"].plot(kind="barh", ax=ax2, color=colors)
+# Use st.columns(2) for equal width, which is often cleaner for alignment.
+col_bar, col_hist = st.columns(2) 
 
-ax2.set_xlabel("Sentiment Score")
-ax2.set_ylabel("Feature")
-ax2.set_title("Feature Sentiment Ranking")
+# Define a consistent figure size for both charts
+COMMON_FIGSIZE = (5, 4.5) 
 
-st.pyplot(fig2)
+# ===============================================
+# Plots
+# ===============================================
+with col_bar:
+    with st.container(height=450):
+        st.markdown("##### Feature Sentiment Score Ranking")
+
+        fig2, ax2 = plt.subplots(figsize=COMMON_FIGSIZE)
+        colors = ["#4CAF50" if x >= 0 else "#F44336" for x in summary_df["sentiment_score"]]
+        summary_df["sentiment_score"].plot(kind="barh", ax=ax2, color=colors)
+
+        ax2.set_xlabel("Sentiment Score")
+        ax2.set_ylabel("")
+        ax2.tick_params(axis='both', which='major', labelsize=8)
+        ax2.set_title("Feature Sentiment Ranking", fontsize=10)
+
+        fig2.tight_layout()
+        st.pyplot(fig2, use_container_width=True)
+
+
+with col_hist:
+    with st.container(height=450):
+        st.markdown("##### Model Confidence Distribution")
+
+        fig, ax = plt.subplots(figsize=COMMON_FIGSIZE)
+        result_df["confidence"].hist(bins=25, edgecolor="black", ax=ax)
+
+        ax.set_xlabel("Confidence Score")
+        ax.set_ylabel("Frequency")
+        ax.tick_params(axis='both', which='major', labelsize=8)
+        ax.set_title("Confidence Distribution", fontsize=10)
+
+        fig.tight_layout()
+        st.pyplot(fig, use_container_width=True)
+
 
 
 # -----------------------------------------
