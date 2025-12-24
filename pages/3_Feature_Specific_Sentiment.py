@@ -3,139 +3,142 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from analysis_pipeline.cleaning_script import clean_text
-from analysis_pipeline.sentiment_analysis import primitive_sentiment
+from analysis_pipeline.feature_sentiment import analyze_sentiment
 
-st.title("Primitive Sentiment Analysis")
-st.write("Upload raw reviews → clean text → run POSITIVE/NEGATIVE sentiment analysis.")
 
-# -------------------------
-# File Upload
-# -------------------------
-uploaded_file = st.file_uploader(
-    "Upload raw scraped CSV file:",
-    type=["csv"]
-)
+# -----------------------------------------
+# PAGE HEADER
+# -----------------------------------------
+st.title("Feature-Specific Sentiment Analysis")
+st.write("Upload raw scraped reviews → clean them → run feature-level sentiment analysis.")
+
+
+# -----------------------------------------
+# FILE UPLOAD
+# -----------------------------------------
+uploaded_file = st.file_uploader("Upload RAW scraped CSV", type=["csv"])
 
 if uploaded_file is None:
-    st.info("Please upload a CSV file to begin.")
+    st.info("Please upload a RAW CSV file from the App Store or Google Play scraper.")
     st.stop()
 
-# Validate extension
-if not uploaded_file.name.endswith(".csv"):
-    st.error("Please upload a valid CSV file ending in `.csv`.")
-    st.stop()
 
-# Load CSV
+# -----------------------------------------
+# LOAD RAW DATA
+# -----------------------------------------
 try:
     raw_df = pd.read_csv(uploaded_file)
 except Exception as e:
     st.error(f"Could not read CSV: {e}")
     st.stop()
 
-# Check for required columns
-REQUIRED_COLS = ["content"]
-missing = [c for c in REQUIRED_COLS if c not in raw_df.columns]
 
-if missing:
+# Ensure required column exists
+if "content" not in raw_df.columns:
     st.error(
-        f"Missing required column(s): {', '.join(missing)}.\n"
-        "This file is NOT valid. Please upload output from the App Store or Google Play scraper."
+        "The file you uploaded does not contain the required column: **content**.\n"
+        "This means it is not raw scraped data.\n\n"
+        "**Please upload the output from the App Store or Google Play scraper.**"
     )
     st.stop()
 
-st.success("CSV uploaded successfully!")
 
-# -------------------------
-# RAW DATA PREVIEW
-# -------------------------
+st.success("Raw CSV loaded successfully.")
 st.subheader("Raw Data Preview")
 st.dataframe(raw_df.head())
 
 
-# -------------------------
+# -----------------------------------------
 # CLEANING STEP
-# -------------------------
-st.subheader("Cleaning the Text")
+# -----------------------------------------
+st.subheader("Cleaning Text")
 
 with st.spinner("Cleaning review text..."):
     df = raw_df.copy()
     df["cleaned_content"] = df["content"].fillna("").apply(clean_text)
 
-# Show before/after comparison
-st.write("### Before and After Cleaning")
+st.write("### Before → After Cleaning")
 st.dataframe(df[["content", "cleaned_content"]].head())
+
 st.success("Cleaning complete!")
 
 
-# -------------------------
-# SENTIMENT ANALYSIS
-# -------------------------
-st.subheader("Running Primitive Sentiment Analysis")
+# -----------------------------------------
+# FEATURE-SPECIFIC SENTIMENT ANALYSIS
+# -----------------------------------------
+st.subheader("Running Feature-Specific Sentiment Analysis")
 
-with st.spinner("Analyzing sentiment..."):
-    sentiment_df = primitive_sentiment(df)
+with st.spinner("Analyzing sentiment across features..."):
+    result_df, summary_df = analyze_sentiment(df, text_column="cleaned_content")
 
-st.success("Sentiment analysis complete!")
+st.success("Feature-level sentiment analysis complete!")
 
-# -------------------------
-# VISUALIZATIONS
-# -------------------------
-st.subheader("Sentiment Overview and Confidence")
 
-# 1. Create two columns for side-by-side layout
-col1, col2 = st.columns(2)
+# -----------------------------------------
+# FEATURE SUMMARY TABLE
+# -----------------------------------------
+st.subheader("Feature-Level Sentiment Summary")
+st.dataframe(summary_df)
 
-# ===============================================
-# PIE CHART (Now in col1)
-# ===============================================
-with col1:
-    st.markdown("##### Sentiment Count") # Use markdown for a smaller title
+# -----------------------------------------
+# SIDE-BY-SIDE VISUALIZATIONS
+# -----------------------------------------
 
-    # Calculate counts
-    good_count = (sentiment_df["sentiment"] == "POSITIVE").sum()
-    bad_count = (sentiment_df["sentiment"] == "NEGATIVE").sum()
-    
-    # Create the figure with a smaller size
-    fig, ax = plt.subplots(figsize=(4, 4)) 
-    ax.pie(
-        [good_count, bad_count],
-        labels=["Positive", "Negative"],
-        autopct="%1.1f%%",
-        startangle=90
-    )
-    ax.axis("equal")
-    
-    # Display the figure in the first column
-    st.pyplot(fig)
+st.subheader("Visual Analysis: Feature Ranking vs. Model Confidence")
 
+# Use st.columns(2) for equal width, which is often cleaner for alignment.
+col_bar, col_hist = st.columns(2) 
+
+# Define a consistent figure size for both charts
+COMMON_FIGSIZE = (5, 4.5) 
 
 # ===============================================
-# CONFIDENCE SCORE HISTOGRAM (Now in col2)
+# Plots
 # ===============================================
-with col2:
-    st.markdown("##### Confidence Distribution") # Use markdown for a smaller title
-    
-    # Create the figure with a smaller size
-    fig2, ax2 = plt.subplots(figsize=(5, 4)) 
-    ax2.hist(sentiment_df["confidence"], bins=20, color="skyblue", edgecolor="black")
-    ax2.set_xlabel("Confidence Score")
-    ax2.set_ylabel("Number of Reviews")
-    ax2.set_title("Confidence Score Distribution", fontsize=10) # Smaller title font
-    
-    # Display the figure in the second column
-    st.pyplot(fig2)
+with col_bar:
+    with st.container(height=450):
+        st.markdown("##### Feature Sentiment Score Ranking")
+
+        fig2, ax2 = plt.subplots(figsize=COMMON_FIGSIZE)
+        colors = ["#4CAF50" if x >= 0 else "#F44336" for x in summary_df["sentiment_score"]]
+        summary_df["sentiment_score"].plot(kind="barh", ax=ax2, color=colors)
+
+        ax2.set_xlabel("Sentiment Score")
+        ax2.set_ylabel("")
+        ax2.tick_params(axis='both', which='major', labelsize=8)
+        ax2.set_title("Feature Sentiment Ranking", fontsize=10)
+
+        fig2.tight_layout()
+        st.pyplot(fig2, use_container_width=True)
 
 
-# -------------------------
+with col_hist:
+    with st.container(height=450):
+        st.markdown("##### Model Confidence Distribution")
+
+        fig, ax = plt.subplots(figsize=COMMON_FIGSIZE)
+        result_df["confidence"].hist(bins=25, edgecolor="black", ax=ax)
+
+        ax.set_xlabel("Confidence Score")
+        ax.set_ylabel("Frequency")
+        ax.tick_params(axis='both', which='major', labelsize=8)
+        ax.set_title("Confidence Distribution", fontsize=10)
+
+        fig.tight_layout()
+        st.pyplot(fig, use_container_width=True)
+
+
+
+# -----------------------------------------
 # DOWNLOAD RESULTS
-# -------------------------
+# -----------------------------------------
 st.subheader("⬇ Download Results")
-final_output = df.join(sentiment_df.drop(columns=["review"]))
-csv_download = final_output.to_csv(index=False).encode("utf-8")
+
+final = df.join(result_df)
 
 st.download_button(
-    label="Download Processed Sentiment CSV",
-    data=csv_download,
-    file_name="processed_sentiment_results.csv",
+    label="Download Full Feature-Specific Sentiment CSV",
+    data=final.to_csv(index=False).encode("utf-8"),
+    file_name="feature_sentiment_results.csv",
     mime="text/csv"
 )
