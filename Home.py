@@ -8,7 +8,8 @@ st.set_page_config(
 )
 
 # Download NLTK data on app startup
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
+
 def download_nltk_data():
     nltk.download('stopwords', quiet=True)
     nltk.download('wordnet', quiet=True)
