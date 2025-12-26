@@ -1,5 +1,11 @@
 import streamlit as st
 import nltk
+# ---------- Page Config ----------
+st.set_page_config(
+    page_title="Sentiment Analysis Platform",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Download NLTK data on app startup
 @st.cache_resource
@@ -17,12 +23,6 @@ ACCENT = "#4670A4"
 LIGHT_BG = "#F8F9FA"  # Very light gray for the hero background
 BORDER_COLOR = "#E6E9EF"
 
-# ---------- Page Config ----------
-st.set_page_config(
-    page_title="Sentiment Analysis Platform",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # ---------- Custom CSS Styling ----------
 st.markdown(
