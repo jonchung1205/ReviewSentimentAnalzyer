@@ -134,7 +134,7 @@ with col_hist:
 # -----------------------------------------
 st.subheader("⬇ Download Results")
 
-final = df.join(result_df)
+final = pd.concat([df.reset_index(drop=True), result_df.reset_index(drop=True)], axis=1)
 
 st.download_button(
     label="Download Full Feature-Specific Sentiment CSV",
