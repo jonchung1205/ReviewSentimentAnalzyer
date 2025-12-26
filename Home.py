@@ -1,4 +1,14 @@
 import streamlit as st
+import nltk
+
+# Download NLTK data on app startup
+@st.cache_resource
+def download_nltk_data():
+    nltk.download('stopwords', quiet=True)
+    nltk.download('wordnet', quiet=True)
+    nltk.download('omw-1.4', quiet=True)
+
+download_nltk_data()
 
 # ---------- Theme Colors ----------
 # Using your existing palette, but adding a neutral gray for borders
